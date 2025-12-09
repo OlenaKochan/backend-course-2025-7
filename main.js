@@ -162,40 +162,42 @@ app.put("/inventory/:id/photo", upload.single("photo"), async (req, res) => {
     } catch (err) { console.error(err); res.status(500).send('DB error'); }
 });
 
-app.delete("/inventory/:id", (req, res) => {
+app.delete("/inventory/:id", async (req, res) => {
     const id = Number(req.params.id);
-    const index = inventory.findIndex(i => i.id === id);
-
-    if (index === -1) return res.status(404).send("Not found");
-    inventory.splice(index, 1);
-    saveInventory(inventory);
-
-    res.send("Deleted");
+    try {
+        const result = await pool.query('delete from inventiry where id=$1 returning *', [id]);
+        if (!result.rows.lenght) return res.status(404).send("Not found");
+        res.send("Deleted");
+    } catch (err) { console.error(err); res.status(500).send("DB error"); }
 });
 
 
-app.post("/search", (req, res) => {
+app.post("/search", async (req, res) => {
     const id = Number(req.body.id);
     const addPhoto = req.body.has_photo === "yes";
-    const item = inventory.find(i => i.id === id);
-
-    if (!item) return res.status(404).send("Not found");
-    const response = { ...item,  photo_url: item.photo ? `/inventory/${id}/photo` : null };
-    if (!addPhoto) delete response.photo;
-    res.json(response);
+    try {
+        const result = await pool.query('SELECT * FROM inventory WHERE id=$1', [id]);
+        if (!result.rows.length) return res.status(404).send("Not found");
+        const item = result.rows[0];
+        const response = { ...item, photo_url: item.photo ? `/inventory/${id}/photo` : null };
+        if (!addPhoto) delete response.photo;
+        res.json(response);
+    } catch (err) { console.error(err); res.status(500).send('DB error'); }
 });
 
-app.get("/search", (req, res) => {
+app.get("/search", async (req, res) => {
     const id = Number(req.query.id);
     const addPhoto = req.query.has_photo === "yes";
-    const item = inventory.find(i => i.id === id);
-
-    if (!item) return res.status(404).send("Not found");
-    const response = { ...item, photo_url: item.photo ? `/inventory/${id}/photo` : null
-    };
-    if (!addPhoto) delete response.photo;
-    res.json(response);
+    try {
+        const result = await pool.query('SELECT * FROM inventory WHERE id=$1', [id]);
+        if (!result.rows.length) return res.status(404).send("Not found");
+        const item = result.rows[0];
+        const response = { ...item, photo_url: item.photo ? `/inventory/${id}/photo` : null };
+        if (!addPhoto) delete response.photo;
+        res.json(response);
+    } catch (err) { console.error(err); res.status(500).send('DB error'); }
 });
+
 
 app.use((req, res) => {
     res.status(405).send("Method Not Allowed");

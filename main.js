@@ -3,7 +3,17 @@ const { program } = require("commander");
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
+require('dotenv').config();
+const { Pool } = require('pg');
 
+// Підключення до PostgreSQL 
+const pool = new Pool({
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT),
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME
+});
 program
     .option("-h, --host <host>", "server host")
     .option("-p, --port <port>", "server port")
@@ -33,22 +43,6 @@ if (!fs.existsSync(cacheDir)) {
 } else {
     console.log(`Cache directory ${cacheDir} already exists`);
 }
-
-const inventoryFile = path.join(cacheDir, "inventory.json");
-if (!fs.existsSync(inventoryFile)) {
-    fs.writeFileSync(inventoryFile, JSON.stringify([]));
-}
-
-function loadInventory() {
-    return JSON.parse(fs.readFileSync(inventoryFile, "utf8"));
-}
-
-function saveInventory(data) {
-    fs.writeFileSync(inventoryFile, JSON.stringify(data, null, 2));
-}
-
-let inventory = loadInventory();
-let nextID = inventory.length > 0 ? Math.max(...inventory.map(i => i.id)) + 1 : 1;
 
 const app = express();
 
@@ -86,87 +80,29 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-/**
- * @swagger
- * /register:
- *   post:
- *     summary: Реєстрація нового пристрою
- *     consumes:
- *       - multipart/form-data
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               inventory_name:
- *                 type: string
- *                 description: Ім'я пристрою
- *               description:
- *                 type: string
- *                 description: Опис пристрою
- *               photo:
- *                 type: string
- *                 format: binary
- *                 description: Фото пристрою
- *     responses:
- *       201:
- *         description: Пристрій успішно додано
- *       400:
- *         description: Не вказано inventory_name
- */
 
-app.post("/register", upload.single("photo"), (req, res) => {
+app.post("/register", upload.single("photo"), async (req, res) => {
     const name = req.body.inventory_name;
     if (!name) {
         return res.status(400).send("inventory_name is required");
     }
-    const item = {
-        id: nextID++,
-        inventory_name: name,
-        description: req.body.description || "",
-        photo: req.file ? req.file.filename : null
-    };
-
-    inventory.push(item);
-    saveInventory(inventory);
-    res.status(201).json(item);
+    try {
+     const photo = req.file ? req.file.filename : null;
+     const result = await pool.query(
+      'INSERT INTO inventory (inventory_name, description, photo) VALUES ($1,$2,$3) RETURNING *',
+      [name, req.body.description || '', photo]
+     );
+     res.status(201).json(result.rows[0]);
+  } catch (err) {
+     console.error(err);
+     res.status(500).send('DB error');
+  }
 });
-
-/**
- * @swagger
- * /inventory:
- *   get:
- *     summary: Отримати список всіх інвентаризованих речей
- *     responses:
- *       200:
- *         description: Список пристроїв
- */
 
 app.get("/inventory", (req, res) => {
     
     res.json(inventory);
 });
-
-/**
- * @swagger
- * /inventory/{id}:
- *   get:
- *     summary: Отримати інформацію про конкретну річ
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: ID пристрою
- *     responses:
- *       200:
- *         description: Інформація про річ
- *       404:
- *         description: Річ не знайдена
- */
 
 app.get("/inventory/:id", (req, res) => {
     const id = Number(req.params.id);
@@ -180,35 +116,6 @@ app.get("/inventory/:id", (req, res) => {
     res.json(result);
 });
 
-/**
- * @swagger
- * /inventory/{id}:
- *   put:
- *     summary: Оновити назву або опис інвентарної речі
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: Ідентифікатор речі
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               inventory_name:
- *                 type: string
- *               description:
- *                 type: string
- *     responses:
- *       200:
- *         description: Обʼєкт успішно оновлений
- *       404:
- *         description: Річ з таким ID не знайдена
- */
 
 app.put("/inventory/:id", (req, res) => {
     const id = Number(req.params.id);
@@ -221,30 +128,6 @@ app.put("/inventory/:id", (req, res) => {
     saveInventory(inventory);
     res.json(item);
 });
-
-/**
- * @swagger
- * /inventory/{id}/photo:
- *   get:
- *     summary: Отримати фото інвентарної речі
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: Ідентифікатор речі
- *     responses:
- *       200:
- *         description: Повертає зображення
- *         content:
- *           image/jpeg:
- *             schema:
- *               type: string
- *               format: binary
- *       404:
- *         description: Фото або річ не знайдені
- */
 
 app.get("/inventory/:id/photo", (req, res) => {
     const id = Number(req.params.id);
@@ -262,36 +145,6 @@ app.get("/inventory/:id/photo", (req, res) => {
     res.sendFile(imgPath);
 });
 
-/**
- * @swagger
- * /inventory/{id}/photo:
- *   put:
- *     summary: Оновити фото інвентарної речі
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: ID речі
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               photo:
- *                 type: string
- *                 format: binary
- *     responses:
- *       200:
- *         description: Фото оновлено
- *       400:
- *         description: Файл не вказаний або невірний формат
- *       404:
- *         description: Річ з таким ID не знайдена
- */
 
 app.put("/inventory/:id/photo", upload.single("photo"), (req, res) => {
     const id = Number(req.params.id);
@@ -305,25 +158,6 @@ app.put("/inventory/:id/photo", upload.single("photo"), (req, res) => {
     res.json(item);
 });
 
-/**
- * @swagger
- * /inventory/{id}:
- *   delete:
- *     summary: Видалити інвентарну річ
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: Ідентифікатор речі для видалення
- *     responses:
- *       200:
- *         description: Річ успішно видалена
- *       404:
- *         description: Річ з таким ID не знайдена
- */
-
 app.delete("/inventory/:id", (req, res) => {
     const id = Number(req.params.id);
     const index = inventory.findIndex(i => i.id === id);
@@ -335,31 +169,6 @@ app.delete("/inventory/:id", (req, res) => {
     res.send("Deleted");
 });
 
-/**
- * @swagger
- * /search:
- *   post:
- *     summary: Пошук інвентарної речі за ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/x-www-form-urlencoded:
- *           schema:
- *             type: object
- *             properties:
- *               id:
- *                 type: integer
- *               has_photo:
- *                 type: string
- *                 enum: ["yes", "no"]
- *             required:
- *               - id
- *     responses:
- *       200:
- *         description: Інформація про знайдену річ
- *       404:
- *         description: Річ не знайдена
- */
 
 app.post("/search", (req, res) => {
     const id = Number(req.body.id);

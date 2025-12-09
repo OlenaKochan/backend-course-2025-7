@@ -80,6 +80,36 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+/**
+ * @swagger
+ * /register:
+ *   post:
+ *     summary: Реєстрація нового пристрою
+ *     consumes:
+ *       - multipart/form-data
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               inventory_name:
+ *                 type: string
+ *                 description: Ім'я пристрою
+ *               description:
+ *                 type: string
+ *                 description: Опис пристрою
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *                 description: Фото пристрою
+ *     responses:
+ *       201:
+ *         description: Пристрій успішно додано
+ *       400:
+ *         description: Не вказано inventory_name
+ */
 
 app.post("/register", upload.single("photo"), async (req, res) => {
     const name = req.body.inventory_name;
@@ -99,6 +129,16 @@ app.post("/register", upload.single("photo"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /inventory:
+ *   get:
+ *     summary: Отримати список всіх інвентаризованих речей
+ *     responses:
+ *       200:
+ *         description: Список пристроїв
+ */
+
 app.get("/inventory", async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM inventory ORDER BY id');
@@ -108,6 +148,25 @@ app.get("/inventory", async (req, res) => {
         res.status(500).send('DB error');
     }
 });
+
+/**
+ * @swagger
+ * /inventory/{id}:
+ *   get:
+ *     summary: Отримати інформацію про конкретну річ
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID пристрою
+ *     responses:
+ *       200:
+ *         description: Інформація про річ
+ *       404:
+ *         description: Річ не знайдена
+ */
 
 app.get("/inventory/:id", async (req, res) => {
     const id = Number(req.params.id);
@@ -123,6 +182,36 @@ app.get("/inventory/:id", async (req, res) => {
 });
 
 
+/**
+ * @swagger
+ * /inventory/{id}:
+ *   put:
+ *     summary: Оновити назву або опис інвентарної речі
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Ідентифікатор речі
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               inventory_name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Обʼєкт успішно оновлений
+ *       404:
+ *         description: Річ з таким ID не знайдена
+ */
+
 app.put("/inventory/:id", async(req, res) => {
     const id = Number(req.params.id);
     const { inventory_name, description } = req.body;
@@ -136,6 +225,30 @@ app.put("/inventory/:id", async(req, res) => {
     } catch (err) { console.error(err); res.status(500).send('DB error'); }
 });
 
+/**
+ * @swagger
+ * /inventory/{id}/photo:
+ *   get:
+ *     summary: Отримати фото інвентарної речі
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Ідентифікатор речі
+ *     responses:
+ *       200:
+ *         description: Повертає зображення
+ *         content:
+ *           image/jpeg:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       404:
+ *         description: Фото або річ не знайдені
+ */
+
 app.get("/inventory/:id/photo", async (req, res) => {
     const id = Number(req.params.id);
     try {
@@ -148,6 +261,36 @@ app.get("/inventory/:id/photo", async (req, res) => {
     } catch (err) { console.error(err); res.status(500).send('DB error'); }
 });
 
+/**
+ * @swagger
+ * /inventory/{id}/photo:
+ *   put:
+ *     summary: Оновити фото інвентарної речі
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID речі
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Фото оновлено
+ *       400:
+ *         description: Файл не вказаний або невірний формат
+ *       404:
+ *         description: Річ з таким ID не знайдена
+ */
 
 app.put("/inventory/:id/photo", upload.single("photo"), async (req, res) => {
     const id = Number(req.params.id);
@@ -162,6 +305,25 @@ app.put("/inventory/:id/photo", upload.single("photo"), async (req, res) => {
     } catch (err) { console.error(err); res.status(500).send('DB error'); }
 });
 
+/**
+ * @swagger
+ * /inventory/{id}:
+ *   delete:
+ *     summary: Видалити інвентарну річ
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Ідентифікатор речі для видалення
+ *     responses:
+ *       200:
+ *         description: Річ успішно видалена
+ *       404:
+ *         description: Річ з таким ID не знайдена
+ */
+
 app.delete("/inventory/:id", async (req, res) => {
     const id = Number(req.params.id);
     try {
@@ -171,6 +333,31 @@ app.delete("/inventory/:id", async (req, res) => {
     } catch (err) { console.error(err); res.status(500).send("DB error"); }
 });
 
+/**
+ * @swagger
+ * /search:
+ *   post:
+ *     summary: Пошук інвентарної речі за ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: integer
+ *               has_photo:
+ *                 type: string
+ *                 enum: ["yes", "no"]
+ *             required:
+ *               - id
+ *     responses:
+ *       200:
+ *         description: Інформація про знайдену річ
+ *       404:
+ *         description: Річ не знайдена
+ */
 
 app.post("/search", async (req, res) => {
     const id = Number(req.body.id);

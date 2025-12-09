@@ -123,45 +123,43 @@ app.get("/inventory/:id", async (req, res) => {
 });
 
 
-app.put("/inventory/:id", (req, res) => {
+app.put("/inventory/:id", async(req, res) => {
     const id = Number(req.params.id);
-    const item = inventory.find(i => i.id === id);
-
-    if (!item) return res.status(404).send("Not found");
-    if (req.body.inventory_name) item.inventory_name = req.body.inventory_name;
-    if (req.body.description) item.description = req.body.description;
-
-    saveInventory(inventory);
-    res.json(item);
+    const { inventory_name, description } = req.body;
+    try { 
+        const result = await pool.query(
+            'update inventory SET invenroty_name = $1, description = $2 where id = $3 returning *',
+            [inventory_name, description, id]
+        );
+        if (result.rows.lenght === 0) return res.status(404).send("Not found");
+        res.json(result.rows[0]);
+    } catch (err) { console.error(err); res.status(500).send('DB error'); }
 });
 
-app.get("/inventory/:id/photo", (req, res) => {
+app.get("/inventory/:id/photo", async (req, res) => {
     const id = Number(req.params.id);
-    const item = inventory.find(i => i.id === id);
-
-    if (!item || !item.photo) {
-        return res.status(404).send("Photo not found");
-    }
-    const imgPath = path.join(cacheDir, item.photo);
-
-    if (!fs.existsSync(imgPath)) {
-        return res.status(404).send("Photo file missing");
-    }
-    res.setHeader("Content-Type", "image/jpeg");
-    res.sendFile(imgPath);
+    try {
+        const result = await pool.query('select photo FROM inventory WHERE id=$1', [id]);
+        if (!result.rows.length || !result.rows[0].photo) return res.status(404).send("Photo not found");
+        const imgPath = path.join(cacheDir, result.rows[0].photo);
+        if (!fs.existsSync(imgPath)) return res.status(404).send("Photo file missing");
+        res.setHeader("Content-Type", "image/jpeg");
+        res.sendFile(imgPath);
+    } catch (err) { console.error(err); res.status(500).send('DB error'); }
 });
 
 
-app.put("/inventory/:id/photo", upload.single("photo"), (req, res) => {
+app.put("/inventory/:id/photo", upload.single("photo"), async (req, res) => {
     const id = Number(req.params.id);
-    const item = inventory.find(i => i.id === id);
-
-    if (!item) return res.status(404).send("Not found");
     if (!req.file) return res.status(400).send("Missing photo");
-
-    item.photo = req.file.filename;
-    saveInventory(inventory);
-    res.json(item);
+    try {
+        const result = await pool.query(
+            'update inventory SET photo=$1 WHERE id=$2 RETURNING *',
+            [req.file.filename, id]
+        );
+        if (!result.rows.length) return res.status(404).send("Not found");
+        res.json(result.rows[0]);
+    } catch (err) { console.error(err); res.status(500).send('DB error'); }
 });
 
 app.delete("/inventory/:id", (req, res) => {

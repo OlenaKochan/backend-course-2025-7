@@ -99,21 +99,27 @@ app.post("/register", upload.single("photo"), async (req, res) => {
   }
 });
 
-app.get("/inventory", (req, res) => {
-    
-    res.json(inventory);
+app.get("/inventory", async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM inventory ORDER BY id');
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('DB error');
+    }
 });
 
-app.get("/inventory/:id", (req, res) => {
+app.get("/inventory/:id", async (req, res) => {
     const id = Number(req.params.id);
-    const item = inventory.find(i => i.id === id);
-
-    if (!item) return res.status(404).send("Not found");
-    const result = {
-        ...item,
-        photo_url: item.photo ? `/inventory/${id}/photo` : null
-    };
-    res.json(result);
+    try {
+        const result = await pool.query('SELECT * FROM inventory WHERE id=$1', [id]);
+        if (result.rows.length === 0) return res.status(404).send("Not found");
+        const item = result.rows[0];
+        res.json({ ...item, photo_url: item.photo ? `/inventory/${id}/photo` : null });
+    } catch (err) { 
+        console.error(err); 
+        res.status(500).send('DB error'); 
+    }
 });
 
 

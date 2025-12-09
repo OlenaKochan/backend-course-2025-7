@@ -30,9 +30,9 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
-      - ./db/init:/docker-entrypoint-initdb.d:ro
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
-      - "${DB_PORT}:${DB_PORT"
+      - "${DB_PORT}:${DB_PORT}"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME} -h localhost"]
       interval: 10s

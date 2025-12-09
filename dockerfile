@@ -1,3 +1,4 @@
+# Dockerfile (простий, для розробки з nodemon)
 FROM node:18
 
 WORKDIR /usr/src/app
@@ -14,4 +15,5 @@ RUN mkdir -p ./cache
 
 EXPOSE 8888
 
+# Для розробки — використати nodemon (dev dependency)
 CMD ["npm", "run", "dev"]

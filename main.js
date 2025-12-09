@@ -14,27 +14,15 @@ const pool = new Pool({
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME
 });
-program
-    .option("-h, --host <host>", "server host")
-    .option("-p, --port <port>", "server port")
-    .option("-c, --cache <dir>", "cache directory");
+const opts = { 
+  port: process.env.PORT,
+  host: process.env.HOST,
+  cache: process.env.CACHE
+};
 
-program.parse();
-const opts = program.opts();
-
-if (!opts.host) {
-    console.error('Please, input host parameter');
-    process.exit(1);
-}
-
-if (!opts.port) {
-    console.error('Please, input port parameter');
-    process.exit(1);
-}
-
-if (!opts.cache) {
-    console.error('Please, input directory parameter');
-    process.exit(1);
+if (!opts.port || !opts.host || !opts.cache) {
+  console.error("Please, set PORT, HOST, and CACHE in .env");
+  process.exit(1);
 }
 
 const cacheDir = path.resolve(opts.cache);
@@ -217,7 +205,7 @@ app.put("/inventory/:id", async(req, res) => {
     const { inventory_name, description } = req.body;
     try { 
         const result = await pool.query(
-            'update inventory SET invenroty_name = $1, description = $2 where id = $3 returning *',
+            'update inventory SET inventory_name = $1, description = $2 where id = $3 returning *',
             [inventory_name, description, id]
         );
         if (result.rows.lenght === 0) return res.status(404).send("Not found");
@@ -327,7 +315,7 @@ app.put("/inventory/:id/photo", upload.single("photo"), async (req, res) => {
 app.delete("/inventory/:id", async (req, res) => {
     const id = Number(req.params.id);
     try {
-        const result = await pool.query('delete from inventiry where id=$1 returning *', [id]);
+        const result = await pool.query('delete from inventory where id=$1 returning *', [id]);
         if (!result.rows.lenght) return res.status(404).send("Not found");
         res.send("Deleted");
     } catch (err) { console.error(err); res.status(500).send("DB error"); }
@@ -364,7 +352,7 @@ app.post("/search", async (req, res) => {
     const addPhoto = req.body.has_photo === "yes";
     try {
         const result = await pool.query('SELECT * FROM inventory WHERE id=$1', [id]);
-        if (!result.rows.length) return res.status(404).send("Not found");
+        if (!result.rows.lenght) return res.status(404).send("Not found");
         const item = result.rows[0];
         const response = { ...item, photo_url: item.photo ? `/inventory/${id}/photo` : null };
         if (!addPhoto) delete response.photo;

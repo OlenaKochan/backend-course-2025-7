@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon --legacy-watch main.js",
+    "debug": "node --inspect main.js -h 127.0.0.1 -p 8888 -c ./cache"
   },
   "repository": {
     "type": "git",
@@ -19,8 +20,10 @@
   "homepage": "https://github.com/OlenaKochan/backend-course-2025-6#readme",
   "dependencies": {
     "commander": "^14.0.2",
+    "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "multer": "^2.0.2",
+    "pg": "^8.16.3",
     "superagent": "^10.2.3",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
